@@ -113,7 +113,7 @@ func init() {
 func staticRouter(router *gin.Engine) {
 	//如果密码不为空
 	if password != "" {
-		//创建账户列表
+		//创建账户map
 		accountList := map[string]string{
 			username: password,
 		}
@@ -132,39 +132,58 @@ func staticRouter(router *gin.Engine) {
 			c.Writer.Write(indexHTML)
 		})
 	}
+	//http操作静态资源
 	staticFs, _ := fs.Sub(f, "web/dist/static")
 	router.StaticFS("/static", http.FS(staticFs))
 }
 
 func main() {
+	//取web引擎实例
 	server := gin.Default()
+	//设置可信代理
 	server.SetTrustedProxies(nil)
+	//使用压缩中间件，支持资源压缩功能
 	server.Use(gzip.Gzip(gzip.DefaultCompression))
+	//启动路由
 	staticRouter(server)
+
+	//HTTP服务操作
+	//GET操作,连接终端websocket
 	server.GET("/term", func(c *gin.Context) {
+		//调用终端websocket
 		controller.TermWs(c, time.Duration(timeout)*time.Minute)
 	})
+	//GET操作,SSH服务检测
 	server.GET("/check", func(c *gin.Context) {
+		//检测SSH服务
 		responseBody := controller.CheckSSH(c)
+		//保存连接密码
 		responseBody.Data = map[string]interface{}{
 			"savePass": savePass,
 		}
+		//渲染JSON数据及HTTP状态码给客户端
 		c.JSON(200, responseBody)
 	})
+	//文件资源操作
 	file := server.Group("/file")
 	{
+		//请求文件列表
 		file.GET("/list", func(c *gin.Context) {
 			c.JSON(200, controller.FileList(c))
 		})
+		//下载文件
 		file.GET("/download", func(c *gin.Context) {
 			controller.DownloadFile(c)
 		})
+		//上传文件
 		file.POST("/upload", func(c *gin.Context) {
 			c.JSON(200, controller.UploadFile(c))
 		})
+		//上传/下载进度处理
 		file.GET("/progress", func(c *gin.Context) {
 			controller.UploadProgressWs(c)
 		})
 	}
+	//启动HTTP服务
 	server.Run(fmt.Sprintf(":%d", *port))
 }
