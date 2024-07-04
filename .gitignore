@@ -2,3 +2,5 @@
 .idea
 node_modules
 dist
+/qodana.yaml
+/webssh.exe
